@@ -1,82 +1,57 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-const app = express();
-// const { verifyToken } = require("./validation"); --> har ikke lyst til det er på alle og så tilføj linje 55 i stedet for 54
-
-// swagger dependencies
 const swaggerUi = require("swagger-ui-express");
 const yaml = require("yamljs");
-
-// setup swagger
-const swaggerDefinition = yaml.load('./swagger.yaml');
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDefinition));
-
-// import routes
-const productRoutes = require("./routes/car");
-const authRoutes = require("./routes/auth");
-
-// CORS npm package
 const cors = require("cors");
-
-app.use(cors({
-    "origin": "*"
-}));
+const fs = require('fs');
+const path = require('path');
 
 require("dotenv-flow").config();
 
+const app = express();
 
-// parse request of content-type JSON
+// CORS configuration
+app.use(cors({
+    origin: "*"
+}));
+
+// Parse request of content-type JSON
 app.use(bodyParser.json());
 
-
-
-
-
-
-
 mongoose.set('strictQuery', false);
-mongoose.connect
- (
+mongoose.connect(
     process.env.DBHOST,
     {
-        useUnifiedTopology:true,
+        useUnifiedTopology: true,
         useNewUrlParser: true
     }
+).catch(error => console.log("Error connecting to MongoDB: " + error));
+mongoose.connection.once("open", () => console.log("Successfully connected to MongoDB"));
 
-).catch(error => console.log("Error connecting to MongoDB:" + error));
-mongoose.connection.once("open", () => console.log("Succesfully connected to MongoDB"));
+// Load and modify Swagger document
+const swaggerFilePath = path.join(__dirname, 'swagger.yaml');
+let swaggerDocument = yaml.load(swaggerFilePath);
+swaggerDocument.servers[0].url = process.env.APPLICATION_URL || 'http://localhost:6000/api/';
 
+// Serve Swagger docs
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
+// Import routes
+const productRoutes = require("./routes/car");
+const authRoutes = require("./routes/auth");
 
-
-
-
-
-
-
-
-
-// route
+// Routes
 app.get("/api/welcome", (req, res) => {
+    res.status(200).send({ message: "Welcome to the MEN RESTful API" });
+});
 
-    res.status(200).send({message: "Welcome to the MEN RESTful API"});
-})
-
-
-// post, put, delete - CRUD
 app.use("/api/car", productRoutes);
-// app.use("/api/car", verifyToken, productRoutes); --> Hvis jeg vil have man skal bruge auth-token på alle
 app.use("/api/user", authRoutes);
 
-
-
-
 const PORT = process.env.PORT || 4000;
-// Start up server
-app.listen(PORT, async(req, res) => {
+app.listen(PORT, () => {
     console.log("Server is running on port: " + PORT);
-})
+});
 
 module.exports = app;
-
